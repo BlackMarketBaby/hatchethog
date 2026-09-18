@@ -12,6 +12,7 @@
 </head>
 <body>
 <div class="wrap"><canvas id="screen" width="960" height="540"></canvas></div>
+<script src="wavedash.js"></script>
 <script>
 (() => {
   const screen = document.getElementById('screen');
@@ -320,8 +321,10 @@
   const state={started:false,t:0,last:performance.now(),paused:false,gameOver:false,win:false,score:0,wave:1,waveTotal:1,spawnBudget:0,butcherBudget:0,oldManBudget:0,mudBudget:0,spawnTimer:0,tractorTimer:0,mudTimer:0,msgTimer:0,shake:0,shakeX:0,shakeY:0,distance:0,escapeAt:12500};
   const pig={x:88,y:156,r:13,speed:188,maxHp:4,hp:4,inv:0,cd:0,anim:0,attack:1,throwBoost:0,mudSlow:0};
   const hatchets=[], farmers=[], butcherShots=[], particles=[], powerups=[], tractors=[], mudPatches=[];
+  let runKills=0, runReported=false;
+  function finishRun(){ if(runReported) return; runReported=true; window.HatchetHogPlatform.finishRun(state.score,state.wave,runKills); }
 
-  function reset(started=true){ state.started=started; state.t=0; state.last=performance.now(); state.paused=false; state.gameOver=false; state.win=false; state.score=0; state.wave=1; state.waveTotal=1; state.distance=0; state.shake=0; state.spawnBudget=0; state.butcherBudget=0; state.oldManBudget=0; state.mudBudget=0; state.spawnTimer=0; state.tractorTimer=0; state.mudTimer=0; state.msgTimer=0; pig.x=88; pig.y=156; pig.hp=pig.maxHp; pig.inv=0; pig.cd=0; pig.anim=0; pig.attack=1; pig.throwBoost=0; pig.mudSlow=0; hatchets.length=farmers.length=butcherShots.length=particles.length=powerups.length=tractors.length=mudPatches.length=0; if(started){ audio.resumeMusic(); startWave(1); } }
+  function reset(started=true){ runKills=0; runReported=false; state.started=started; state.t=0; state.last=performance.now(); state.paused=false; state.gameOver=false; state.win=false; state.score=0; state.wave=1; state.waveTotal=1; state.distance=0; state.shake=0; state.spawnBudget=0; state.butcherBudget=0; state.oldManBudget=0; state.mudBudget=0; state.spawnTimer=0; state.tractorTimer=0; state.mudTimer=0; state.msgTimer=0; pig.x=88; pig.y=156; pig.hp=pig.maxHp; pig.inv=0; pig.cd=0; pig.anim=0; pig.attack=1; pig.throwBoost=0; pig.mudSlow=0; hatchets.length=farmers.length=butcherShots.length=particles.length=powerups.length=tractors.length=mudPatches.length=0; if(started){ audio.resumeMusic(); startWave(1); } }
   function addShake(a){ state.shake=Math.min(.38,state.shake+a); }
   function carryPowerupsForward(){ for(const p of powerups){ p.vx=Math.max(p.vx,-12); p.y=clamp(p.y,playMinY+8,playMaxY-8); } }
   function oldManChainsForWave(n){ return n<5?0:(n<8?1:(n<16?2:3+Math.floor((n-16)/8))); }
@@ -747,9 +750,9 @@
     for(let i=tractors.length-1;i>=0;i--){ const tr=tractors[i]; if(tr.warn>0){ tr.warn-=dt; if(tr.warn<=0) addShake(.12); } else { tr.x+=tr.vx*dt; } if(tr.warn<=0 && overlap(tractorHitbox(tr),pigHitbox()) && pig.inv<=0){ pig.hp--; pig.inv=1.15; addShake(.24); audio.hurt(); for(let k=0;k<18;k++) particles.push(makeParticle(pig.x,pig.y)); if(pig.hp<=0){ state.gameOver=true; audio.stopMusic(); } } if(tr.x<-110) tractors.splice(i,1); }
     for(let i=farmers.length-1;i>=0;i--){ const f=farmers[i]; f.wob+=dt*(f.kind==='oldman'?5.8:6); f.axePhase+=dt*10; f.x+=f.vx*dt; if(f.kind==='oldman'){ const path=(f.pathPhase||0)+(VW-f.x)*.032; f.y=clamp(f.baseY+Math.sin(path)*f.amp,playMinY,playMaxY); } else { f.y+=(f.vy+Math.sin(f.wob)*3.5)*dt; f.y=clamp(f.y,playMinY,f.kind==='butcher'?playMaxY-10:playMaxY); } f.flash=Math.max(0,f.flash-dt); f.anim+=dt*(f.kind==='oldman'?9.5:7.0); if(f.kind==='butcher'){ f.throwCd-=dt; if(f.throwCd<=0 && f.x>pig.x+55 && f.x<VW+10){ const dx=pig.x-f.x, dy=(pig.y-20)-f.y, len=Math.max(1,Math.hypot(dx,dy)); audio.hyuh(); butcherShots.push({x:f.x-8,y:f.y-18,vx:dx/len*205,vy:dy/len*205,life:3}); f.throwCd=2.75+rand(.35,1.35); } } if(overlap(farmerBodyHitbox(f), pigHitbox()) || f.x < pig.x-40){ farmers.splice(i,1); if(pig.inv<=0){ pig.hp--; pig.inv=1.15; addShake(.16); audio.hurt(); for(let k=0;k<14;k++) particles.push(makeParticle(pig.x,pig.y)); if(pig.hp<=0){ state.gameOver=true; audio.stopMusic(); } } } }
     for(let i=butcherShots.length-1;i>=0;i--){ const b=butcherShots[i]; b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt; if(overlap(butcherShotHitbox(b),pigHitbox())){ butcherShots.splice(i,1); if(pig.inv<=0){ pig.hp--; pig.inv=1.15; addShake(.14); audio.hurt(); for(let k=0;k<10;k++) particles.push(makeParticle(pig.x,pig.y)); if(pig.hp<=0){ state.gameOver=true; audio.stopMusic(); } } continue; } if(b.life<=0||b.x<-40||b.y<0||b.y>HUD_Y) butcherShots.splice(i,1); }
-    for(let i=farmers.length-1;i>=0;i--){ const f=farmers[i]; const fb=farmerHitbox(f); for(let j=hatchets.length-1;j>=0;j--){ const h=hatchets[j]; if(overlap(fb, hatchetHitbox(h))){ hatchets.splice(j,1); f.hp-=h.dmg; f.flash=.14; addShake(.08); audio.hit(); for(let k=0;k<12;k++) particles.push(makeParticle(f.x,f.y)); if(f.hp<=0){ farmers.splice(i,1); state.score+=(f.kind==='butcher'?225:150); addShake(.12); audio.kill(); for(let k=0;k<18;k++) particles.push(makeParticle(f.x,f.y,true)); if(f.boss && chance(.62)) spawnPowerup(f.x,f.y); else if(f.kind==='butcher' && chance(state.wave>=12?.24:.16)) spawnPowerup(f.x,f.y); else if(!f.boss && chance(state.wave>=12?.07:.045)) spawnPowerup(f.x,f.y); } else state.score+=35; break; } } }
+    for(let i=farmers.length-1;i>=0;i--){ const f=farmers[i]; const fb=farmerHitbox(f); for(let j=hatchets.length-1;j>=0;j--){ const h=hatchets[j]; if(overlap(fb, hatchetHitbox(h))){ hatchets.splice(j,1); f.hp-=h.dmg; f.flash=.14; addShake(.08); audio.hit(); for(let k=0;k<12;k++) particles.push(makeParticle(f.x,f.y)); if(f.hp<=0){ farmers.splice(i,1); state.score+=(f.kind==='butcher'?225:150); runKills++; addShake(.12); audio.kill(); for(let k=0;k<18;k++) particles.push(makeParticle(f.x,f.y,true)); if(f.boss && chance(.62)) spawnPowerup(f.x,f.y); else if(f.kind==='butcher' && chance(state.wave>=12?.24:.16)) spawnPowerup(f.x,f.y); else if(!f.boss && chance(state.wave>=12?.07:.045)) spawnPowerup(f.x,f.y); } else state.score+=35; break; } } }
     for(let i=particles.length-1;i>=0;i--){ const p=particles[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=(1-dt*4.6); p.vy*=(1-dt*4.6); p.vy+=260*dt; p.life-=dt; if(p.life<=0) particles.splice(i,1); }
-    if(state.spawnBudget<=0&&state.butcherBudget<=0&&state.oldManBudget<=0&&state.mudBudget<=0&&farmers.length===0&&butcherShots.length===0&&tractors.length===0&&mudPatches.length===0) startWave(state.wave+1);
+    if(state.gameOver) finishRun(); else if(state.spawnBudget<=0&&state.butcherBudget<=0&&state.oldManBudget<=0&&state.mudBudget<=0&&farmers.length===0&&butcherShots.length===0&&tractors.length===0&&mudPatches.length===0) startWave(state.wave+1);
   }
 
   function render(){
@@ -799,9 +802,7 @@
 </script>
 <script>
   window.addEventListener('load', () => {
-    if (window.Wavedash && typeof window.Wavedash.init === 'function') {
-      window.Wavedash.init();
-    }
+    window.HatchetHogPlatform.init();
   }, { once: true });
 </script>
 </body>
