@@ -797,5 +797,12 @@
   reset(false); requestAnimationFrame(loop);
 })();
 </script>
+<script>
+  window.addEventListener('load', () => {
+    if (window.Wavedash && typeof window.Wavedash.init === 'function') {
+      window.Wavedash.init();
+    }
+  }, { once: true });
+</script>
 </body>
 </html>
