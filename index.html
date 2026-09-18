@@ -7,7 +7,7 @@
   <style>
     html, body { margin:0; height:100%; background:#050713; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
     .wrap { height:100%; display:flex; align-items:center; justify-content:center; }
-    canvas { background:#050713; image-rendering: pixelated; image-rendering: crisp-edges; }
+    canvas { background:#050713; width:min(960px, 100vw, 177.778vh); height:auto; image-rendering: pixelated; image-rendering: crisp-edges; }
   </style>
 </head>
 <body>
@@ -103,7 +103,11 @@
     let ac=null, master=null, musicGain=null, muted=false, started=false, step=0;
     const note = n => 440*Math.pow(2,(n-69)/12);
     function ensure(){
-      if(ac) return; ac = new (window.AudioContext||window.webkitAudioContext)();
+      if(ac){ if(ac.state === 'suspended') ac.resume().catch(error => console.warn('Could not resume audio:', error)); return; }
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if(!AudioContextClass) return;
+      ac = new AudioContextClass();
+      if(ac.state === 'suspended') ac.resume().catch(error => console.warn('Could not resume audio:', error));
       master=ac.createGain(); master.gain.value=.72; master.connect(ac.destination);
       musicGain=ac.createGain(); musicGain.gain.value=.16; musicGain.connect(master); startMusic();
     }
@@ -797,7 +801,9 @@
     postProcess();
   }
   function loop(now){ const dt=clamp((now-state.last)/1000,0,1/20); state.last=now; update(dt); render(); requestAnimationFrame(loop); }
-  reset(false); requestAnimationFrame(loop);
+  reset(false);
+  window.HatchetHogPlatform.progress(0.5);
+  requestAnimationFrame(loop);
 })();
 </script>
 <script>

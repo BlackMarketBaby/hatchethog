@@ -4,20 +4,40 @@
   let leaderboardReady = Promise.resolve(null);
   let saveQueue = Promise.resolve();
 
+  function progress(value) {
+    const platform = window.Wavedash;
+    if (typeof platform?.updateLoadProgressZeroToOne === 'function') {
+      platform.updateLoadProgressZeroToOne(value);
+    }
+  }
+
+  progress(0);
+
+  async function findLeaderboard() {
+    try {
+      const response = await sdk.getOrCreateLeaderboard(
+        'high-scores',
+        sdk.LeaderboardSortOrder.DESC,
+        sdk.LeaderboardDisplayType.NUMERIC
+      );
+      if (response.success && response.data?.id) return response.data.id;
+      console.warn('Could not load Wavedash leaderboard:', response.message || response);
+    } catch (error) {
+      console.warn('Could not load Wavedash leaderboard:', error);
+    }
+    return null;
+  }
+
   function init() {
     sdk = window.Wavedash;
     if (!sdk || typeof sdk.init !== 'function') return;
 
+    progress(1);
     sdk.init();
     statsReady = sdk.requestStats()
       .then(response => response.success)
       .catch(error => { console.warn('Could not load Wavedash stats:', error); return false; });
-    leaderboardReady = sdk.getOrCreateLeaderboard(
-      'high-scores',
-      sdk.LeaderboardSortOrder.DESC,
-      sdk.LeaderboardDisplayType.NUMERIC
-    ).then(response => response.success ? response.data.id : null)
-      .catch(error => { console.warn('Could not load Wavedash leaderboard:', error); return null; });
+    leaderboardReady = findLeaderboard();
   }
 
   async function saveRun(score, stage, kills) {
@@ -37,10 +57,10 @@
       sdk.storeStats();
     }
 
-    const leaderboardId = await leaderboardReady;
+    const leaderboardId = await leaderboardReady || await findLeaderboard();
     if (leaderboardId && score > 0) {
       const response = await sdk.uploadLeaderboardScore(
-        leaderboardId, score, true, '', { stage, kills }
+        leaderboardId, score, true, undefined, { stage, kills }
       );
       if (!response.success) console.warn('Could not upload Wavedash score:', response.message);
     }
@@ -52,5 +72,5 @@
     return saveQueue;
   }
 
-  window.HatchetHogPlatform = { init, finishRun };
+  window.HatchetHogPlatform = { init, finishRun, progress };
 })();
